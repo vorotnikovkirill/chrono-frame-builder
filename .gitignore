@@ -1,0 +1,49 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# macOS
+.DS_Store
+
+# IDE / editors
+.vscode/
+.idea/
+
+# Build artifacts
+build/
+dist/
+*.egg-info/
+
+# Local data and private CAD files
+data/private/
+private/
+*.prt
+*.sim
+*.op2
+*.h5
+
+# Large CAD formats - keep public examples small and intentional
+*.x_t
+*.x_b
+
+# Simulation results
+results/
+outputs/
+logs/
+
+# Temporary files
+tmp/
+temp/
+*.log

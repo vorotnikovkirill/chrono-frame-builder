@@ -1,0 +1,46 @@
+{
+  "schema_version": "0.1.0",
+  "project_name": "minimal_pendulum",
+  "units": {
+    "length": "mm",
+    "angle": "deg"
+  },
+  "bodies": [
+    {
+      "name": "base",
+      "cad_file": "cad/base.step",
+      "color": [0.7, 0.7, 0.7],
+      "opacity": 1.0,
+      "fixed": true
+    },
+    {
+      "name": "arm",
+      "cad_file": "cad/arm.step",
+      "color": [0.2, 0.5, 0.9],
+      "opacity": 0.8,
+      "fixed": false
+    }
+  ],
+  "frames": [
+    {
+      "body": "base",
+      "name": "hinge_A",
+      "origin": [0.0, 0.0, 0.0],
+      "rotation_matrix": [
+        [1.0, 0.0, 0.0],
+        [0.0, 1.0, 0.0],
+        [0.0, 0.0, 1.0]
+      ]
+    },
+    {
+      "body": "arm",
+      "name": "hinge_A",
+      "origin": [0.0, 0.0, 0.0],
+      "rotation_matrix": [
+        [1.0, 0.0, 0.0],
+        [0.0, 1.0, 0.0],
+        [0.0, 0.0, 1.0]
+      ]
+    }
+  ]
+}

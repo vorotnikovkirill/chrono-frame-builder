@@ -1,0 +1,48 @@
+[project]
+name = "chrono-frame-builder"
+version = "0.1.0"
+description = "A lightweight engineering tool for defining, storing, inspecting, and validating body-attached frames for Project Chrono / PyChrono models."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+authors = [
+    { name = "Kirill Vorotnikov" }
+]
+keywords = [
+    "project-chrono",
+    "pychrono",
+    "multibody",
+    "cad",
+    "frames",
+    "markers",
+    "mechanism",
+    "simulation"
+]
+classifiers = [
+    "Development Status :: 2 - Pre-Alpha",
+    "Intended Audience :: Science/Research",
+    "Intended Audience :: Manufacturing",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Topic :: Scientific/Engineering",
+]
+
+dependencies = [
+    "numpy>=1.24"
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+    "ruff>=0.5"
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B"]
