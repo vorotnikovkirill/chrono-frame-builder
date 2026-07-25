@@ -100,3 +100,19 @@ The three-point preview helper is a temporary convenience built on the same math
 - P0 is the origin
 - P1 defines `+X`
 - P2 supplies a direction that is projected to define `+Y`
+
+## Feature candidates
+
+Stage B1c introduces feature candidates as the bridge between raw viewer picking and future
+feature-based frame creation. A candidate records:
+
+- feature kind, such as `point`, `triangle_face`, or `mesh_edge`
+- source type, currently `mesh`
+- a candidate point, such as a picked point, triangle center, or edge midpoint
+- an optional normalized direction, such as a triangle normal or edge tangent
+- optional source IDs and metadata for tracing the candidate back to mesh cells, edges, files,
+  or later BRep entities
+
+Mesh and STL features are approximate because they come from tessellated triangles and edges.
+They are useful for visual workflows, but future STEP/BRep features should provide more exact
+surface normals, edge directions, circle centers, and analytic feature metadata.
