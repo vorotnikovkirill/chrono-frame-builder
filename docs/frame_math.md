@@ -80,3 +80,23 @@ The project may store length in millimeters.
 Transform math does not convert units.
 
 Unit conversion should happen in adapters, for example when exporting to Chrono.
+
+## Feature-based frame construction
+
+The intended custom-frame workflow is feature based rather than based on three arbitrary
+points. A future viewer should let the user choose:
+
+- an origin feature, such as a vertex, face center, edge midpoint, or inertial feature
+- a primary signed frame axis, such as `+Z`, aligned to a selected vector such as a face normal
+- a secondary signed frame axis, such as `+X`, aligned to a selected vector such as an edge
+  direction after projection onto the plane normal to the primary axis
+
+The remaining axis is constructed automatically with cross products so the rotation matrix is
+right-handed and orthonormal. The core helper for this is
+`frame_from_origin_primary_secondary(...)`.
+
+The three-point preview helper is a temporary convenience built on the same math:
+
+- P0 is the origin
+- P1 defines `+X`
+- P2 supplies a direction that is projected to define `+Y`
