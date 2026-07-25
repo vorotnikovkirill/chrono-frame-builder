@@ -33,10 +33,16 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+visualization = [
+    "pyvista>=0.44"
+]
 dev = [
     "pytest>=8.0",
     "ruff>=0.5"
 ]
+
+[project.scripts]
+chrono-frame-viewer = "chrono_frame_builder.viewer:main"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

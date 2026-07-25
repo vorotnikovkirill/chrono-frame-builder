@@ -45,6 +45,27 @@ Version 0.1.0 focuses on the core data model:
 
 CAD import, 3D visualization, interactive picking, and Chrono code generation are planned for later stages.
 
+## Stage B0 viewer
+
+The package includes a minimal, non-editing PyVista viewer for visual inspection of stored
+frames and mesh geometry already referenced by `project.json`.
+
+Install the optional visualization dependency:
+
+```bash
+pip install chrono-frame-builder[visualization]
+```
+
+Open a project:
+
+```bash
+chrono-frame-viewer path/to/project.json
+```
+
+The Stage B0 viewer supports STL, OBJ, PLY, VTK, and VTP mesh files listed in each body's
+`cad_file` field. Unsupported or missing geometry is reported as a warning, and stored frame
+axes are still drawn.
+
 ## What this project is not
 
 This is not a replacement for Simscape Multibody.

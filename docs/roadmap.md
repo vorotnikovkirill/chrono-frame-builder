@@ -78,6 +78,27 @@ Features:
 - opacity control
 - show frame axes
 
+## Stage B0 - Minimal visual inspection viewer
+
+Goal:
+
+Provide a small PyVista-based viewer before the full interactive viewer stage.
+
+Features:
+
+- load `project.json`
+- display supported mesh files referenced by body `cad_file`
+- draw axes for frames already stored in the project
+- report missing or unsupported geometry without editing the project
+
+Out of scope:
+
+- point picking
+- frame editing
+- saving from the viewer
+- STEP or Parasolid import
+- FEM, MNF, and Chrono code generation
+
 ## Stage 5 - Interactive frame creation
 
 Goal:

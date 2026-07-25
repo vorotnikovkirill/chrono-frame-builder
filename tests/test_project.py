@@ -2,7 +2,6 @@ import pytest
 
 from chrono_frame_builder import FrameNotFoundError, Project
 
-
 EXAMPLE_PROJECT = "examples/minimal_pendulum/project.json"
 
 
