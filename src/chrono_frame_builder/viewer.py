@@ -11,6 +11,7 @@ import numpy as np
 
 from chrono_frame_builder.core.frame import Frame
 from chrono_frame_builder.core.project import Project
+from chrono_frame_builder.core.transform import frame_from_three_points
 
 SUPPORTED_GEOMETRY_EXTENSIONS = frozenset({".stl", ".obj", ".ply", ".vtk", ".vtp"})
 AXIS_COLORS = {"x": "red", "y": "green", "z": "blue"}
@@ -42,6 +43,45 @@ class AxisSegment:
     start: np.ndarray
     end: np.ndarray
     color: str
+
+
+@dataclass
+class ThreePointPickState:
+    """Collect three picked points and convert them into a preview frame."""
+
+    points: list[np.ndarray]
+    preview_frame: Frame | None = None
+    warning: str | None = None
+
+    @property
+    def next_point_label(self) -> str:
+        """Return the label for the next point expected from the user."""
+        return f"P{len(self.points)}"
+
+    def add_point(self, point: np.ndarray) -> Frame | None:
+        """Add one picked point and return a preview frame when P0/P1/P2 are complete."""
+        self.warning = None
+        self.points.append(np.asarray(point, dtype=float))
+
+        if len(self.points) < 3:
+            return None
+
+        try:
+            self.preview_frame = frame_from_three_points(
+                "__preview__",
+                "three_point",
+                self.points[0],
+                self.points[1],
+                self.points[2],
+            )
+        except ValueError as error:
+            self.warning = str(error)
+            self.preview_frame = None
+            self.points.clear()
+            return None
+
+        self.points.clear()
+        return self.preview_frame
 
 
 def resolve_project_file(path: str | Path) -> Path:
@@ -193,6 +233,7 @@ def render_project(
     project_path: str | Path,
     *,
     axis_length: float | None = None,
+    pick_frame: bool = False,
 ) -> None:
     """Render supported geometry files and stored frames with PyVista."""
     try:
@@ -225,12 +266,85 @@ def render_project(
         labels = [frame.full_name for frame in project.frames]
         plotter.add_point_labels(origins, labels, font_size=12, point_size=0)
 
+    if pick_frame:
+        enable_three_point_preview(plotter, pv, resolved_axis_length)
+
     plotter.add_axes()
     plotter.show(title=f"chrono-frame-builder: {project.project_name}")
 
 
-def main(argv: list[str] | None = None) -> int:
-    """CLI entry point for the Stage B0 viewer."""
+def enable_three_point_preview(plotter, pv, axis_length: float) -> None:
+    """Enable PyVista point picking for previewing a frame from P0/P1/P2."""
+    pick_state = ThreePointPickState(points=[])
+    preview_actor_names = [
+        "preview_frame_x",
+        "preview_frame_y",
+        "preview_frame_z",
+        "preview_origin",
+    ]
+
+    def clear_preview() -> None:
+        for actor_name in preview_actor_names:
+            if hasattr(plotter, "actors") and actor_name not in plotter.actors:
+                continue
+            plotter.remove_actor(actor_name, reset_camera=False)
+
+    def draw_preview(frame: Frame) -> None:
+        clear_preview()
+        for segment in frame_axis_segments(frame, axis_length=axis_length):
+            line = pv.Line(segment.start, segment.end)
+            plotter.add_mesh(
+                line,
+                color=segment.color,
+                line_width=6,
+                name=f"preview_frame_{segment.axis_name}",
+            )
+
+        marker = pv.Sphere(radius=axis_length * 0.06, center=frame.origin)
+        plotter.add_mesh(marker, color="yellow", name="preview_origin")
+        plotter.render()
+
+    def print_preview(frame: Frame) -> None:
+        print("Preview frame from picked points:")
+        print(f"origin: {np.array2string(frame.origin, precision=6, suppress_small=True)}")
+        print("rotation_matrix:")
+        print(np.array2string(frame.rotation_matrix, precision=6, suppress_small=True))
+        print("Preview only: project.json was not modified.")
+
+    def on_pick(point) -> None:
+        if point is None:
+            return
+
+        picked_point = np.asarray(point, dtype=float)
+        point_label = pick_state.next_point_label
+        frame = pick_state.add_point(picked_point)
+        print(f"{point_label}: {np.array2string(picked_point, precision=6, suppress_small=True)}")
+
+        if pick_state.warning:
+            print(f"warning: {pick_state.warning}", file=sys.stderr)
+            print("Pick P0, P1, and P2 again.", file=sys.stderr)
+            return
+
+        if frame is not None:
+            draw_preview(frame)
+            print_preview(frame)
+
+    picking_options = {
+        "callback": on_pick,
+        "show_message": "Pick P0 origin, P1 +X direction, then P2 in the XY plane.",
+        "left_clicking": True,
+        "show_point": True,
+    }
+
+    try:
+        plotter.enable_surface_point_picking(**picking_options)
+    except TypeError:
+        picking_options.pop("show_point")
+        plotter.enable_surface_point_picking(**picking_options)
+
+
+def build_arg_parser() -> argparse.ArgumentParser:
+    """Build the viewer CLI argument parser."""
     parser = argparse.ArgumentParser(
         prog="chrono-frame-viewer",
         description="Open a minimal PyVista view of mesh geometry and stored project frames.",
@@ -245,7 +359,17 @@ def main(argv: list[str] | None = None) -> int:
         default=None,
         help="Override the frame axis length in project units.",
     )
+    parser.add_argument(
+        "--pick-frame",
+        action="store_true",
+        help="Preview a new frame by picking P0 origin, P1 +X, and P2 in the XY plane.",
+    )
+    return parser
 
+
+def main(argv: list[str] | None = None) -> int:
+    """CLI entry point for the Stage B0/B1 viewer."""
+    parser = build_arg_parser()
     args = parser.parse_args(argv)
 
     try:
@@ -254,7 +378,12 @@ def main(argv: list[str] | None = None) -> int:
         for warning in geometry_warnings(geometry):
             print(f"warning: {warning}", file=sys.stderr)
 
-        render_project(project, project_path, axis_length=args.axis_length)
+        render_project(
+            project,
+            project_path,
+            axis_length=args.axis_length,
+            pick_frame=args.pick_frame,
+        )
     except Exception as error:
         print(f"chrono-frame-viewer: error: {error}", file=sys.stderr)
         return 2

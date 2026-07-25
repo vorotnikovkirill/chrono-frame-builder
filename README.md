@@ -69,6 +69,21 @@ The Stage B0 viewer supports STL, OBJ, PLY, VTK, and VTP mesh files listed in ea
 `cad_file` field. Unsupported or missing geometry is reported as a warning, and stored frame
 axes are still drawn.
 
+## Stage B1a three-point frame preview
+
+The viewer can preview a new frame from three picked mesh points:
+
+```bash
+python3 -m chrono_frame_builder.viewer examples/viewer_demo/project.json --pick-frame
+```
+
+Pick `P0` for the frame origin, `P1` for the positive X direction, and `P2` for a point in
+the frame XY plane. After the third valid pick, the viewer draws preview axes and prints the
+computed origin and rotation matrix to the terminal.
+
+This mode is preview-only. It does not name a new frame, modify `project.json`, or save
+anything yet.
+
 ## What this project is not
 
 This is not a replacement for Simscape Multibody.

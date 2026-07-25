@@ -112,6 +112,27 @@ Features:
 - small human-readable ASCII STL geometry
 - body/reference frame and offset marker frame
 
+## Stage B1a - Three-point frame preview
+
+Goal:
+
+Let an engineer preview a frame by picking three points on displayed mesh geometry.
+
+Features:
+
+- `--pick-frame` viewer mode
+- P0 defines the frame origin
+- P1 defines the positive X direction
+- P2 defines the XY plane
+- preview axes are drawn after three valid picks
+- computed origin and rotation matrix are printed to the terminal
+
+Out of scope:
+
+- frame naming UI
+- saving to `project.json`
+- interactive editing beyond preview
+
 ## Stage 5 - Interactive frame creation
 
 Goal:
