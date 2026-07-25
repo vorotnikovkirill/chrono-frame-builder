@@ -56,11 +56,14 @@ Install the optional visualization dependency:
 pip install chrono-frame-builder[visualization]
 ```
 
-Open a project:
+Open the reproducible viewer demo:
 
 ```bash
-chrono-frame-viewer path/to/project.json
+chrono-frame-viewer examples/viewer_demo/project.json
 ```
+
+The demo project contains one small ASCII STL mesh and two predefined frames:
+`demo_bracket.body_origin` and `demo_bracket.marker_tip`.
 
 The Stage B0 viewer supports STL, OBJ, PLY, VTK, and VTP mesh files listed in each body's
 `cad_file` field. Unsupported or missing geometry is reported as a warning, and stored frame

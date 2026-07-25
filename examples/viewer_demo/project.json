@@ -1,0 +1,39 @@
+{
+  "schema_version": "0.1.0",
+  "project_name": "viewer_demo",
+  "units": {
+    "length": "mm",
+    "angle": "deg"
+  },
+  "bodies": [
+    {
+      "name": "demo_bracket",
+      "cad_file": "geometry/demo_bracket.stl",
+      "color": [0.35, 0.62, 0.82],
+      "opacity": 0.85,
+      "fixed": false
+    }
+  ],
+  "frames": [
+    {
+      "body": "demo_bracket",
+      "name": "body_origin",
+      "origin": [0.0, 0.0, 0.0],
+      "rotation_matrix": [
+        [1.0, 0.0, 0.0],
+        [0.0, 1.0, 0.0],
+        [0.0, 0.0, 1.0]
+      ]
+    },
+    {
+      "body": "demo_bracket",
+      "name": "marker_tip",
+      "origin": [80.0, 0.0, 12.0],
+      "rotation_matrix": [
+        [0.0, -1.0, 0.0],
+        [1.0, 0.0, 0.0],
+        [0.0, 0.0, 1.0]
+      ]
+    }
+  ]
+}

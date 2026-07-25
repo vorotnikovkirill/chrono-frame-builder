@@ -97,7 +97,20 @@ Out of scope:
 - frame editing
 - saving from the viewer
 - STEP or Parasolid import
-- FEM, MNF, and Chrono code generation
+- FEM, MNF, Adams, and Chrono code generation
+
+## Stage B0.1 - Reproducible viewer demo
+
+Goal:
+
+Provide a tiny project that opens in the Stage B0 viewer and shows both mesh geometry and
+stored frames.
+
+Features:
+
+- `examples/viewer_demo/project.json`
+- small human-readable ASCII STL geometry
+- body/reference frame and offset marker frame
 
 ## Stage 5 - Interactive frame creation
 
