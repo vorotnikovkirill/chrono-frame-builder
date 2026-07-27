@@ -84,6 +84,62 @@ computed origin and rotation matrix to the terminal.
 This mode is preview-only. It does not name a new frame, modify `project.json`, or save
 anything yet.
 
+## Stage B1d mesh snap feature inspection
+
+The viewer can inspect mesh snap feature candidates from surface picks as a debug mode:
+
+```bash
+python3 -m chrono_frame_builder.viewer examples/viewer_demo/project.json --inspect-features
+```
+
+When the picked mesh cell can be recovered as a triangle, clicks near a triangle edge report
+a `mesh_edge_snap` candidate with start, midpoint, end, and tangent handles. Picks in the
+triangle interior report a `triangle_face` candidate with face center and normal. If
+triangle-cell data is unavailable, the viewer falls back to a `point` candidate at the picked
+position and says so.
+
+Repeated picks of the same candidate do not reprint the same block of terminal output. This
+debug mode does not create frames, name frames, assign origin/primary/secondary roles, or save
+anything. Mesh and STL features are tessellated approximations; future STEP/BRep support
+should provide more exact analytic feature candidates.
+
+## Stage B1 create-frame preview
+
+The beginning of the Simscape-like frame workflow is available in preview-only mode:
+
+```bash
+python3 -m pip install -e '.[visualization,ui]'
+python3 -m chrono_frame_builder.viewer examples/viewer_demo/project.json --create-frame
+```
+
+With the optional UI dependencies installed, `--create-frame` opens one integrated Qt window:
+the PyVista model view fills the center and a Create Frame dock is attached on the right. Click
+geometry in the default **Create marker** mode to create `marker_001`, `marker_002`, and later
+markers immediately. Each has a compact global-orientation RGB triad and label, and remains in
+the preview marker list until the window closes. Select a marker in that list to edit its name,
+position, rotation matrix, and source status.
+
+The **Frame Origin** section reports the geometry-origin source or manual XYZ override. The
+**Primary Axis** and **Secondary Axis** sections follow the Simscape-style workflow: choose a
+signed frame axis, select **Along Reference Frame Axis** or **Based on Geometric Feature**, then
+use the selected face normal or edge tangent as needed. Principal inertia-axis controls are shown
+as planned but disabled. Switch click mode to **Select geometry feature** before choosing an axis
+feature. The primary direction remains dominant; the core math projects the secondary direction
+as necessary to form a right-handed frame.
+
+The selected mesh feature is only a thin visual cue; marker triads and labels remain the primary
+visual objects. If the optional Qt dependencies are unavailable, the viewer reports that and
+falls back to the standalone PyVista/Tk panel or its keyboard controls.
+
+The Qt dock also includes an editable marker transform table: marker name, position `X/Y/Z`, and
+the full `3 x 3` rotation matrix. **Apply marker properties** validates a finite, right-handed
+orthonormal rotation before moving or rotating the selected preview marker. This gives numerical
+editing equal footing with visual feature selection.
+
+This mode previews the frame from origin, primary, and secondary feature roles using the core
+feature-based frame math. It does not save `project.json`, name a new frame, or create final
+frame data yet; persistent naming and saving come later.
+
 ## What this project is not
 
 This is not a replacement for Simscape Multibody.
