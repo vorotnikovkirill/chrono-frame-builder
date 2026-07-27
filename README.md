@@ -129,13 +129,24 @@ reference axis `+X`, and secondary marker axis `+X` to reference axis `+Y`, make
 point along global `+X` and local `+X` point along global `+Y`. The resulting rotation matrix is
 `[[0, 0, 1], [1, 0, 0], [0, 1, 0]]`.
 
+For a simpler primary-direction workflow, the **Quick Orientation** section targets the selected
+local axis directly. For example, choose local `+Z`, then use **Pick Edge Direction** to align it
+with an edge tangent, **Pick Face Normal** to align it with a face normal, or **Pick Line by 2
+Points** to align it from point A to point B. Each action stages the same visible pending candidate
+before **Apply Candidate**, **Flip Candidate**, or **Cancel Candidate**. The existing Secondary
+Axis still determines roll; if it is parallel to the quick primary direction, the editor retains
+the primary source and asks for a non-parallel secondary axis.
+
 For geometric orientation, choose **Pick Primary Feature** or **Pick Secondary Feature**. The
-active click mode changes to vector picking, so the next face normal or edge tangent click updates
-the selected marker instead of creating another marker, then returns to **Select/Edit Marker**.
-**Flip Primary Direction** and **Flip Secondary Direction** reverse mesh normal/tangent direction
-when needed. Principal inertia-axis controls are shown as planned but disabled. The primary
-direction remains dominant; the core math projects the secondary direction to remove roll
-ambiguity while preserving a right-handed frame.
+active click mode changes to vector picking. A face selection highlights the face and shows its
+normal arrow; an edge selection highlights the edge and shows its tangent arrow. The marker does
+not change until **Apply Candidate** is pressed. Use **Flip Candidate** to reverse the pending
+arrow or **Cancel Candidate** to discard it and return to **Select/Edit Marker**. Points and
+vertices cannot provide a face/edge direction, but they can define the two points of a Quick
+Orientation line. Principal inertia-axis controls are shown as planned but disabled. The primary
+direction remains dominant;
+the core math projects the secondary direction to remove roll ambiguity while preserving a
+right-handed frame.
 
 The selected mesh feature is only a thin visual cue; marker triads and labels remain the primary
 visual objects. If the optional Qt dependencies are unavailable, the viewer reports that and
@@ -146,9 +157,32 @@ the full `3 x 3` rotation matrix. **Apply marker properties** validates a finite
 orthonormal rotation before moving or rotating the selected preview marker. This gives numerical
 editing equal footing with visual feature selection.
 
-This mode previews the frame from origin, primary, and secondary feature roles using the core
-feature-based frame math. It does not save `project.json`, name a new frame, or create final
-frame data yet; persistent naming and saving come later.
+Saving remains explicit: **Save Selected Marker** validates the selected preview marker, creates
+its frame in `project.json`, or updates its linked frame after later edits. It shows `Unsaved`,
+`Saved`, or `Modified` status, and never auto-saves. Mesh snapping remains tessellated and
+approximate; STEP/BRep feature extraction and hole, cylinder, and circle-center detection are
+planned for later work.
+
+### Coordinate context
+
+The current hierarchy is `world/assembly -> body/part -> marker/frame`. The project schema stores
+each frame's origin and rotation relative to its parent body/part, and the viewer displays those
+same body-local Cartesian XYZ values. Current examples are single-body, identity-transform cases:
+the schema does not yet contain assembly/body placement transforms, so full assembly-coordinate
+conversion is not implemented. The Create Frame dock states this limitation directly.
+
+### Hole-block mesh demo
+
+Use `examples/hole_block` to inspect the current mesh-picker behavior around a through-hole:
+
+```bash
+python3 -m chrono_frame_builder.viewer examples/hole_block/project.json --create-frame
+```
+
+The demo is an 80 x 40 x 16 block with a radius-8, 48-sided Z-axis hole. It is intentionally an
+OBJ mesh, so its hole boundary is faceted. The viewer can expose face normals and edge tangents,
+but it does not yet infer a true circle center or cylinder axis. Regenerate the small mesh with
+`python3 examples/hole_block/make_hole_block.py`.
 
 ## What this project is not
 

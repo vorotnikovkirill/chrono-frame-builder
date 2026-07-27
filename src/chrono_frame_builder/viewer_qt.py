@@ -7,11 +7,13 @@ from pathlib import Path
 
 import numpy as np
 
+from chrono_frame_builder.core.coordinate_context import coordinate_context_summary
 from chrono_frame_builder.core.features import FeatureCandidate, MeshEdgeSnapCandidate
 from chrono_frame_builder.core.marker_editor import (
     CreateFrameEditorState,
     create_frame_editor_summary,
 )
+from chrono_frame_builder.core.marker_persistence import save_selected_preview_marker
 from chrono_frame_builder.core.project import Project
 from chrono_frame_builder.viewer import (
     AXIS_COLORS,
@@ -65,6 +67,7 @@ def render_create_frame_qt(
         QMainWindow,
         QPushButton,
         QRadioButton,
+        QScrollArea,
         QVBoxLayout,
         QWidget,
     )
@@ -119,11 +122,34 @@ def render_create_frame_qt(
 
     style = create_frame_preview_style_from_bounds(geometry_bounds)
     panel = QWidget(window)
+    panel.setObjectName("createFramePanel")
+    panel.setStyleSheet(
+        """
+        QWidget#createFramePanel { background: #f3f4f6; color: #1f2937; font-size: 13px; }
+        QWidget#createFramePanel QLabel { color: #1f2937; background: transparent; }
+        QGroupBox { background: #ffffff; border: 1px solid #cbd5e1; border-radius: 4px;
+                    color: #1f2937; font-weight: 600; margin-top: 8px; padding: 8px; }
+        QGroupBox::title { subcontrol-origin: margin; left: 9px; padding: 0 3px; color: #111827; }
+        QRadioButton { color: #1f2937; spacing: 6px; }
+        QLineEdit, QComboBox, QListWidget { background: #ffffff; color: #111827;
+                                             border: 1px solid #94a3b8; border-radius: 3px;
+                                             min-height: 24px; }
+        QComboBox QAbstractItemView { background: #ffffff; color: #111827; }
+        QPushButton { background: #e5e7eb; color: #111827; border: 1px solid #94a3b8;
+                      border-radius: 3px; min-height: 28px; padding: 2px 8px; font-weight: 600; }
+        QPushButton:hover { background: #dbeafe; }
+        QListWidget::item:selected { background: #bfdbfe; color: #111827; }
+        QLabel:disabled, QRadioButton:disabled, QPushButton:disabled { color: #64748b; }
+        QLineEdit:disabled, QComboBox:disabled { background: #e2e8f0; color: #64748b; }
+        QLabel#statusMessage { background: #fff7ed; color: #7f1d1d; border: 1px solid #fdba74;
+                               border-radius: 3px; padding: 7px; font-weight: 600; }
+        """
+    )
     panel_layout = QVBoxLayout(panel)
     panel_layout.setContentsMargins(12, 12, 12, 12)
     panel_layout.setSpacing(8)
     title = QLabel("Preview Markers", panel)
-    title.setStyleSheet("font-weight: 600; font-size: 14px;")
+    title.setStyleSheet("font-weight: 700; font-size: 16px;")
     panel_layout.addWidget(title)
     new_marker_button = QPushButton("New Marker", panel)
     panel_layout.addWidget(new_marker_button)
@@ -135,18 +161,73 @@ def render_create_frame_qt(
     panel_layout.addWidget(QLabel("Click mode", panel))
     panel_layout.addWidget(click_mode)
     click_mode_status = QLabel("Active: Create marker", panel)
-    click_mode_status.setStyleSheet("font-weight: 600;")
+    click_mode_status.setStyleSheet("font-weight: 700; font-size: 14px;")
     panel_layout.addWidget(click_mode_status)
 
+    candidate_section = QGroupBox("Pending Candidate", panel)
+    candidate_layout = QFormLayout(candidate_section)
+    pending_type = QLabel(candidate_section)
+    pending_vector = QLabel(candidate_section)
+    pending_instruction = QLabel(candidate_section)
+    pending_instruction.setWordWrap(True)
+    apply_candidate_button = QPushButton("Apply Candidate", candidate_section)
+    flip_candidate_button = QPushButton("Flip Candidate", candidate_section)
+    cancel_candidate_button = QPushButton("Cancel Candidate", candidate_section)
+    candidate_layout.addRow("Feature", pending_type)
+    candidate_layout.addRow("Vector", pending_vector)
+    candidate_layout.addRow(pending_instruction)
+    candidate_layout.addRow(apply_candidate_button)
+    candidate_layout.addRow(flip_candidate_button)
+    candidate_layout.addRow(cancel_candidate_button)
+    candidate_section.setVisible(False)
+    panel_layout.addWidget(candidate_section)
+
+    quick_section = QGroupBox("Quick Orientation", panel)
+    quick_layout = QVBoxLayout(quick_section)
+    quick_axis = QComboBox(quick_section)
+    quick_axis.addItems(AXIS_SELECTOR_ORDER)
+    quick_layout.addWidget(QLabel("Local axis", quick_section))
+    quick_layout.addWidget(quick_axis)
+    quick_pick_face = QPushButton("Pick Face Normal", quick_section)
+    quick_pick_edge = QPushButton("Pick Edge Direction", quick_section)
+    quick_pick_line = QPushButton("Pick Line by 2 Points", quick_section)
+    quick_reference = QPushButton("Use Reference Axis", quick_section)
+    quick_layout.addWidget(quick_pick_face)
+    quick_layout.addWidget(quick_pick_edge)
+    quick_layout.addWidget(quick_pick_line)
+    quick_layout.addWidget(quick_reference)
+    panel_layout.addWidget(quick_section)
+
+    message_label = QLabel("Click New Marker, then click geometry to place marker_001.", panel)
+    message_label.setObjectName("statusMessage")
+    message_label.setWordWrap(True)
+    panel_layout.addWidget(message_label)
+
+    coordinate_section = QGroupBox("Coordinate Context", panel)
+    coordinate_layout = QFormLayout(coordinate_section)
+    parent_body = QLabel(coordinate_section)
+    display_coordinates = QLabel(coordinate_section)
+    saved_coordinates = QLabel(coordinate_section)
+    assembly_transform = QLabel(coordinate_section)
+    for label in (display_coordinates, saved_coordinates, assembly_transform):
+        label.setWordWrap(True)
+    coordinate_layout.addRow("Parent body / part", parent_body)
+    coordinate_layout.addRow("Display", display_coordinates)
+    coordinate_layout.addRow("Saved", saved_coordinates)
+    coordinate_layout.addRow("Assembly", assembly_transform)
+    panel_layout.addWidget(coordinate_section)
+
     marker_list = QListWidget(panel)
-    marker_list.setMinimumHeight(120)
+    marker_list.setMinimumHeight(80)
     panel_layout.addWidget(marker_list)
 
     properties = QGroupBox("Selected Marker Properties", panel)
     properties_layout = QVBoxLayout(properties)
     name_layout = QFormLayout()
     marker_name = QLineEdit(properties)
+    save_status = QLabel(properties)
     name_layout.addRow("Name", marker_name)
+    name_layout.addRow("Save status", save_status)
     properties_layout.addLayout(name_layout)
 
     position_layout = QGridLayout()
@@ -175,7 +256,9 @@ def render_create_frame_qt(
         rotation_fields.append(row_fields)
     properties_layout.addLayout(rotation_layout)
     apply_properties_button = QPushButton("Apply marker properties", properties)
+    save_selected_button = QPushButton("Save Selected Marker", properties)
     properties_layout.addWidget(apply_properties_button)
+    properties_layout.addWidget(save_selected_button)
     panel_layout.addWidget(properties)
 
     origin_section = QGroupBox("Frame Origin", panel)
@@ -244,16 +327,15 @@ def render_create_frame_qt(
     secondary_layout.addWidget(reset_axes)
     panel_layout.addWidget(secondary_section)
 
-    message_label = QLabel("Click New Marker, then click geometry to place marker_001.", panel)
-    message_label.setWordWrap(True)
-    message_label.setStyleSheet("color: #7f1d1d;")
-    panel_layout.addWidget(message_label)
     panel_layout.addStretch(1)
 
     dock = QDockWidget("Create Frame", window)
     dock.setObjectName("create_frame_dock")
-    dock.setWidget(panel)
-    dock.setMinimumWidth(370)
+    dock_scroll_area = QScrollArea(dock)
+    dock_scroll_area.setWidgetResizable(True)
+    dock_scroll_area.setWidget(panel)
+    dock.setWidget(dock_scroll_area)
+    dock.setMinimumWidth(380)
     window.addDockWidget(Qt.DockWidgetArea.RightDockWidgetArea, dock)
 
     marker_actor_names: list[str] = []
@@ -263,6 +345,8 @@ def render_create_frame_qt(
             return "<none>"
         if isinstance(candidate, MeshEdgeSnapCandidate):
             return "edge tangent"
+        if candidate.kind == "line_between_points":
+            return "line direction"
         if candidate.direction is not None:
             return "face normal"
         return "<no direction>"
@@ -287,21 +371,50 @@ def render_create_frame_qt(
             "select_edit": "Select/Edit Marker",
             "pick_primary_vector": "Pick Primary Vector",
             "pick_secondary_vector": "Pick Secondary Vector",
+            "quick_pick_primary_edge": "Pick Edge Direction",
+            "quick_pick_primary_face": "Pick Face Normal",
+            "pick_line_point_a": "Pick Line Point A",
+            "pick_line_point_b": "Pick Line Point B",
         }
-        click_mode_status.setText(
-            f"Active: {click_mode_labels.get(editor_state.click_mode, editor_state.click_mode)}"
-        )
+        pending = editor_state.pending_axis_candidate
+        if pending is not None:
+            active_mode = f"Pending {pending.role_label} Candidate"
+        elif editor_state.click_mode.startswith(("quick_", "pick_line_")) and marker is not None:
+            active_mode = (
+                f"{click_mode_labels[editor_state.click_mode]} for local {marker.primary_axis}"
+            )
+        else:
+            active_mode = click_mode_labels.get(editor_state.click_mode, editor_state.click_mode)
+        click_mode_status.setText(f"Active: {active_mode}")
         click_mode.blockSignals(True)
         if editor_state.click_mode in {"create_marker", "select_edit"}:
             click_mode.setCurrentIndex(click_mode.findData(editor_state.click_mode))
         click_mode.blockSignals(False)
         origin_source.setText(summary["origin_source"])
+        save_status.setText(summary.get("save_status", "Unsaved"))
+        coordinate_context = coordinate_context_summary(
+            project,
+            marker.parent_body_name if marker is not None else None,
+        )
+        parent_body.setText(coordinate_context["parent_body"])
+        display_coordinates.setText(coordinate_context["display_coordinates"])
+        saved_coordinates.setText(coordinate_context["saved_coordinates"])
+        assembly_transform.setText(coordinate_context["assembly_transform"])
+        candidate_section.setVisible(pending is not None)
+        if pending is not None:
+            candidate_section.setTitle(f"Pending {summary['pending_role']} Candidate")
+            pending_type.setText(summary["pending_type"])
+            pending_vector.setText(
+                np.array2string(pending.vector, precision=3, suppress_small=True)
+            )
+            pending_instruction.setText("Apply to assign, Flip to reverse, or Cancel to discard.")
         properties.setEnabled(marker is not None)
         origin_section.setEnabled(marker is not None)
         primary_section.setEnabled(marker is not None)
         secondary_section.setEnabled(marker is not None)
         if marker is None:
             marker_name.clear()
+            save_status.setText("Unsaved")
             for field in [*position_fields, *[item for row in rotation_fields for item in row]]:
                 field.clear()
             primary_source.setText("<none>")
@@ -321,6 +434,7 @@ def render_create_frame_qt(
         secondary_reference_axis.blockSignals(True)
         primary_axis.setCurrentText(marker.primary_axis)
         secondary_axis.setCurrentText(marker.secondary_axis)
+        quick_axis.setCurrentText(marker.primary_axis)
         primary_reference_axis.setCurrentText(marker.primary_reference_axis)
         secondary_reference_axis.setCurrentText(marker.secondary_reference_axis)
         primary_axis.blockSignals(False)
@@ -352,6 +466,66 @@ def render_create_frame_qt(
 
     def clear_selected_feature_cue() -> None:
         _remove_named_actors(plotter, create_frame_actor_names("qt_selected"))
+
+    def clear_pending_candidate_preview() -> None:
+        _remove_named_actors(
+            plotter,
+            [*create_frame_actor_names("qt_candidate"), "qt_line_point_a"],
+        )
+
+    def draw_line_start_point() -> None:
+        """Draw the first point of a pending two-point direction pick."""
+        clear_pending_candidate_preview()
+        if editor_state.line_start_point is None:
+            plotter.render()
+            return
+        point = pv.Sphere(radius=style.marker_radius * 0.65, center=editor_state.line_start_point)
+        plotter.add_mesh(point, color="orange", name="qt_line_point_a")
+        plotter.render()
+
+    def draw_pending_axis_candidate() -> None:
+        """Draw the staged feature direction without changing the marker frame."""
+        clear_pending_candidate_preview()
+        pending = editor_state.pending_axis_candidate
+        if pending is None:
+            plotter.render()
+            return
+
+        if isinstance(pending.feature, MeshEdgeSnapCandidate):
+            plotter.add_mesh(
+                pv.Line(pending.feature.start, pending.feature.end),
+                color="yellow",
+                line_width=3,
+                name="qt_candidate_edge",
+            )
+        else:
+            vertices = np.asarray(pending.feature.metadata.get("triangle_vertices", []))
+            if vertices.shape == (3, 3):
+                face = pv.PolyData(vertices, faces=np.array([3, 0, 1, 2]))
+                plotter.add_mesh(
+                    face,
+                    color="yellow",
+                    opacity=0.35,
+                    name="qt_candidate_point",
+                )
+            else:
+                face_center = pv.Sphere(
+                    radius=style.marker_radius * 0.55,
+                    center=pending.anchor,
+                )
+                plotter.add_mesh(face_center, color="yellow", name="qt_candidate_point")
+        try:
+            arrow = pv.Arrow(
+                start=pending.anchor,
+                direction=pending.vector,
+                scale=style.vector_length,
+                shaft_radius=style.marker_radius * 0.14,
+                tip_radius=style.marker_radius * 0.32,
+            )
+        except Exception:
+            arrow = pv.Line(pending.anchor, pending.anchor + pending.vector * style.vector_length)
+        plotter.add_mesh(arrow, color="orange", name="qt_candidate_vector")
+        plotter.render()
 
     def draw_selected_feature(candidate: FeatureCandidate | MeshEdgeSnapCandidate) -> None:
         """Draw a thin cue only while choosing a geometric axis source."""
@@ -436,9 +610,18 @@ def render_create_frame_qt(
         draw_markers()
         update_panel("Marker properties applied. Preview only: no project files are changed.")
 
+    def save_selected_marker() -> None:
+        try:
+            frame = save_selected_preview_marker(editor_state, project, project_path)
+        except ValueError as error:
+            report_error(error)
+            return
+        update_panel(f"Saved {frame.full_name} to project.json.")
+
     def select_list_marker(item) -> None:
         if item is None:
             return
+        clear_pending_candidate_preview()
         try:
             editor_state.select_marker(int(item.data(Qt.ItemDataRole.UserRole)))
         except ValueError as error:
@@ -449,10 +632,12 @@ def render_create_frame_qt(
 
     def set_click_mode(_index: int) -> None:
         editor_state.set_click_mode(str(click_mode.currentData()))
+        clear_pending_candidate_preview()
         update_panel()
 
     def begin_new_marker() -> None:
         editor_state.begin_new_marker()
+        clear_pending_candidate_preview()
         update_panel("Click geometry to place the next preview marker.")
 
     def set_primary_axis(axis_selector: str) -> None:
@@ -539,6 +724,7 @@ def render_create_frame_qt(
         except ValueError as error:
             report_error(error)
             return
+        clear_pending_candidate_preview()
         update_panel("Pick a face normal or edge tangent for the primary axis.")
 
     def begin_pick_secondary_feature() -> None:
@@ -547,7 +733,71 @@ def render_create_frame_qt(
         except ValueError as error:
             report_error(error)
             return
+        clear_pending_candidate_preview()
         update_panel("Pick a face normal or edge tangent for the secondary axis.")
+
+    def begin_quick_face_pick() -> None:
+        try:
+            editor_state.begin_quick_primary_face_normal(quick_axis.currentText())
+        except ValueError as error:
+            report_error(error)
+            return
+        clear_pending_candidate_preview()
+        update_panel()
+
+    def begin_quick_edge_pick() -> None:
+        try:
+            editor_state.begin_quick_primary_edge_direction(quick_axis.currentText())
+        except ValueError as error:
+            report_error(error)
+            return
+        clear_pending_candidate_preview()
+        update_panel()
+
+    def begin_quick_line_pick() -> None:
+        try:
+            editor_state.begin_quick_primary_line(quick_axis.currentText())
+        except ValueError as error:
+            report_error(error)
+            return
+        clear_pending_candidate_preview()
+        update_panel()
+
+    def use_quick_reference_axis() -> None:
+        try:
+            editor_state.use_quick_primary_reference_axis(quick_axis.currentText())
+        except ValueError as error:
+            report_error(error)
+            return
+        draw_markers()
+        update_panel()
+
+    def apply_pending_candidate() -> None:
+        try:
+            marker = editor_state.apply_pending_axis_candidate()
+        except ValueError as error:
+            report_error(error)
+            return
+        clear_pending_candidate_preview()
+        draw_markers()
+        print(f"Applied geometric feature to {marker.name}.")
+        update_panel(
+            editor_state.warning or "Candidate applied. Preview only: no project files are changed."
+        )
+
+    def flip_pending_candidate() -> None:
+        try:
+            editor_state.flip_pending_axis_candidate()
+        except ValueError as error:
+            report_error(error)
+            return
+        draw_pending_axis_candidate()
+        update_panel("Candidate direction flipped. Apply to assign it.")
+
+    def cancel_pending_candidate() -> None:
+        editor_state.cancel_pending_axis_candidate()
+        clear_pending_candidate_preview()
+        update_panel("Candidate discarded. Select/Edit Marker mode restored.")
 
     def flip_primary_direction() -> None:
         try:
@@ -600,8 +850,33 @@ def render_create_frame_qt(
 
         if click_mode_before_pick in {"pick_primary_vector", "pick_secondary_vector"}:
             clear_selected_feature_cue()
-            draw_markers()
-            print(f"Assigned axis feature: {feature_summary(candidate)}")
+            draw_pending_axis_candidate()
+            pending = editor_state.pending_axis_candidate
+            print(
+                f"Pending {pending.role_label.lower()} candidate: "
+                f"{feature_summary(candidate)}. Apply, Flip, or Cancel in the panel."
+            )
+            update_panel("Candidate preview shown. Apply, Flip, or Cancel in the panel.")
+            return
+
+        if click_mode_before_pick in {
+            "quick_pick_primary_edge",
+            "quick_pick_primary_face",
+            "pick_line_point_b",
+        }:
+            clear_selected_feature_cue()
+            draw_pending_axis_candidate()
+            pending = editor_state.pending_axis_candidate
+            print(
+                f"Pending quick orientation candidate: {feature_summary(candidate)}. "
+                "Apply, Flip, or Cancel in the panel."
+            )
+            update_panel("Candidate preview shown. Apply, Flip, or Cancel in the panel.")
+            return
+
+        if click_mode_before_pick == "pick_line_point_a":
+            draw_line_start_point()
+            print(f"Line point A: {_format_vector(editor_state.line_start_point)}")
             update_panel()
             return
 
@@ -613,6 +888,7 @@ def render_create_frame_qt(
     new_marker_button.clicked.connect(begin_new_marker)
     marker_list.currentItemChanged.connect(lambda current, _previous: select_list_marker(current))
     apply_properties_button.clicked.connect(apply_properties)
+    save_selected_button.clicked.connect(save_selected_marker)
     primary_axis.currentTextChanged.connect(set_primary_axis)
     secondary_axis.currentTextChanged.connect(set_secondary_axis)
     primary_reference_axis.currentTextChanged.connect(set_primary_reference_axis)
@@ -623,6 +899,13 @@ def render_create_frame_qt(
     secondary_feature.toggled.connect(set_secondary_mode)
     primary_use_feature.clicked.connect(begin_pick_primary_feature)
     secondary_use_feature.clicked.connect(begin_pick_secondary_feature)
+    quick_pick_face.clicked.connect(begin_quick_face_pick)
+    quick_pick_edge.clicked.connect(begin_quick_edge_pick)
+    quick_pick_line.clicked.connect(begin_quick_line_pick)
+    quick_reference.clicked.connect(use_quick_reference_axis)
+    apply_candidate_button.clicked.connect(apply_pending_candidate)
+    flip_candidate_button.clicked.connect(flip_pending_candidate)
+    cancel_candidate_button.clicked.connect(cancel_pending_candidate)
     primary_flip_direction.clicked.connect(flip_primary_direction)
     secondary_flip_direction.clicked.connect(flip_secondary_direction)
     reset_axes.clicked.connect(reset_marker_axes)
@@ -641,7 +924,7 @@ def render_create_frame_qt(
 
     plotter.add_axes()
     update_panel()
-    window.resize(1320, 860)
+    window.resize(1200, 800)
     window.show()
     if owns_application:
         app.exec()

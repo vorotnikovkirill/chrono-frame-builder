@@ -150,10 +150,38 @@ marker `+Z` aligned to reference `+X`, together with secondary marker `+X` align
 `[[0, 0, 1], [1, 0, 0], [0, 1, 0]]`.
 
 For geometric mode, **Pick Primary Feature** and **Pick Secondary Feature** switch the viewer to
-an explicit one-click vector-picking mode; a face normal or edge tangent is assigned to the
-selected marker without creating another marker. Direction-flip controls reverse an assigned mesh
-normal or tangent. The secondary vector is projected by the existing feature-based math layer to
-remove roll ambiguity. Principal inertia-axis options are visibly disabled until an inertia
-backend exists. If Qt is unavailable, the viewer reports the condition and uses its standalone
-PyVista/Tk or keyboard fallback. None of these preview paths save frames or create final project
-data.
+an explicit one-click vector-picking mode. A selected face/triangle is highlighted with a normal
+arrow, and a selected edge is highlighted with a tangent arrow. This creates a pending candidate,
+not an immediate orientation change: **Apply Candidate** assigns it, **Flip Candidate** reverses
+the displayed direction, and **Cancel Candidate** discards it. Points and vertices do not provide
+face/edge axis directions; they can be used as the two points of a Quick Orientation line. The
+secondary vector is projected by
+the existing feature-based math layer to remove roll ambiguity. Principal inertia-axis options are
+visibly disabled until an inertia backend exists.
+
+**Quick Orientation** provides a more direct primary-axis path: choose a local axis such as `+Z`,
+then stage an edge tangent, a face normal, or a line from point A to point B. The selected vector
+is still previewed before applying it. The Secondary Axis remains necessary to remove roll
+ambiguity. When it is parallel to the quick primary direction, the editor retains the primary
+source, keeps the last valid triad, and asks for a non-parallel secondary definition. Mesh
+directions remain tessellated STL/OBJ approximations, not true CAD circle or cylinder recognition.
+
+**Save Selected Marker** is an explicit persistence action. It validates the selected marker,
+creates a compatible `Frame` in the loaded project's `frames` list, then updates that linked frame
+after later edits. The status is `Unsaved`, `Saved`, or `Modified`; no edits are auto-saved.
+Mesh-origin and vector candidates remain approximate STL/mesh features; STEP/BRep extraction plus
+analytic holes, cylinders, and circle centers are future work. If Qt is unavailable, the viewer
+reports the condition and uses its standalone PyVista/Tk or keyboard fallback.
+
+## Coordinate hierarchy and mesh-hole demo
+
+The intended transform hierarchy is `world/assembly -> body/part -> marker/frame`. The current
+`Body` schema has CAD metadata but no placement transform, while `Frame` stores its origin and
+rotation with a parent body name. Therefore the current viewer displays and saves body/part-local
+Cartesian XYZ coordinates. The included examples use a single body with an implicit identity body
+transform; full assembly/body transform conversion is planned and is not implied by the UI.
+
+`examples/hole_block` provides a deterministic OBJ block with a 48-sided through-hole. It is useful
+for testing planar triangle normals and faceted hole-boundary edge tangents. As with other STL/OBJ
+meshes, this is tessellated geometry only: no true circle center, hole feature, or cylinder-axis
+recognition is implemented yet.

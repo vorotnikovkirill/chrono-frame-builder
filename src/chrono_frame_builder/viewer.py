@@ -788,6 +788,9 @@ def triangle_feature_candidate_from_vertices(
         metadata["body_name"] = body_name
     if mesh_file is not None:
         metadata["mesh_file"] = mesh_file
+    metadata["triangle_vertices"] = tuple(
+        tuple(float(value) for value in vertex) for vertex in vertices
+    )
 
     source_ids = () if cell_id is None else (cell_id,)
     return triangle_face_candidate(

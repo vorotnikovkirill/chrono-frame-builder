@@ -1,0 +1,39 @@
+{
+  "schema_version": "0.1.0",
+  "project_name": "hole_block",
+  "units": {
+    "length": "mm",
+    "angle": "deg"
+  },
+  "bodies": [
+    {
+      "name": "hole_block",
+      "cad_file": "hole_block.obj",
+      "color": [0.52, 0.7, 0.46],
+      "opacity": 0.9,
+      "fixed": false
+    }
+  ],
+  "frames": [
+    {
+      "body": "hole_block",
+      "name": "body_origin",
+      "origin": [0.0, 0.0, 0.0],
+      "rotation_matrix": [
+        [1.0, 0.0, 0.0],
+        [0.0, 1.0, 0.0],
+        [0.0, 0.0, 1.0]
+      ]
+    },
+    {
+      "body": "hole_block",
+      "name": "hole_reference",
+      "origin": [15.0, 0.0, 0.0],
+      "rotation_matrix": [
+        [1.0, 0.0, 0.0],
+        [0.0, 1.0, 0.0],
+        [0.0, 0.0, 1.0]
+      ]
+    }
+  ]
+}
