@@ -134,15 +134,26 @@ save frames.
 
 The `--create-frame` viewer mode starts the Simscape-like workflow. With the optional
 `.[visualization,ui]` dependencies installed, it opens one Qt application window with the
-PyVista view in the center and an embedded right-side control dock. The default Create marker
-click mode creates a new named preview marker at each selected mesh origin, so multiple compact
-RGB triads and labels remain visible at once. Selecting a marker in the list loads its editable
-name, `X/Y/Z` origin, and `3 x 3` rotation matrix. Manual matrices must be finite, orthonormal,
-and right-handed (`det(R) = +1`) before the selected preview marker is updated.
+PyVista view in the center and an embedded right-side control dock. The marker-editor workflow
+starts in Select/Edit mode. Press **New Marker** to enter one-click Create Marker mode;
+the next selected mesh origin creates a named preview marker and immediately returns to Select/Edit
+mode. This prevents ordinary geometry clicks and vector-picking clicks from creating accidental
+markers. Multiple compact RGB triads and labels remain visible at once. Selecting a marker in the
+list loads its editable name, `X/Y/Z` origin, and `3 x 3` rotation matrix. Manual matrices must
+be finite, orthonormal, and right-handed (`det(R) = +1`) before the selected preview marker is
+updated.
 
 The dock separates **Frame Origin**, **Primary Axis**, and **Secondary Axis**. Each axis chooses
-a signed frame axis and either follows the reference frame or uses a selected face normal or edge
-tangent. The secondary vector is projected by the existing feature-based math layer. Principal
-inertia-axis options are visibly disabled until an inertia backend exists. If Qt is unavailable,
-the viewer reports the condition and uses its standalone PyVista/Tk or keyboard fallback. None
-of these preview paths save frames or create final project data.
+a signed marker axis and an independent signed reference/source axis. In reference mode, primary
+marker `+Z` aligned to reference `+X`, together with secondary marker `+X` aligned to reference
+`+Y`, produces columns `X=global Y`, `Y=global Z`, and `Z=global X`:
+`[[0, 0, 1], [1, 0, 0], [0, 1, 0]]`.
+
+For geometric mode, **Pick Primary Feature** and **Pick Secondary Feature** switch the viewer to
+an explicit one-click vector-picking mode; a face normal or edge tangent is assigned to the
+selected marker without creating another marker. Direction-flip controls reverse an assigned mesh
+normal or tangent. The secondary vector is projected by the existing feature-based math layer to
+remove roll ambiguity. Principal inertia-axis options are visibly disabled until an inertia
+backend exists. If Qt is unavailable, the viewer reports the condition and uses its standalone
+PyVista/Tk or keyboard fallback. None of these preview paths save frames or create final project
+data.

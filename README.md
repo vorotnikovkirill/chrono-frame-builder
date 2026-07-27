@@ -114,18 +114,28 @@ python3 -m chrono_frame_builder.viewer examples/viewer_demo/project.json --creat
 
 With the optional UI dependencies installed, `--create-frame` opens one integrated Qt window:
 the PyVista model view fills the center and a Create Frame dock is attached on the right. Click
-geometry in the default **Create marker** mode to create `marker_001`, `marker_002`, and later
-markers immediately. Each has a compact global-orientation RGB triad and label, and remains in
-the preview marker list until the window closes. Select a marker in that list to edit its name,
-position, rotation matrix, and source status.
+**New Marker**, then click geometry to create `marker_001`. The editor immediately returns to
+**Select/Edit Marker** mode, so subsequent geometry clicks cannot create extra markers. Use
+**New Marker** again to create `marker_002` intentionally. Each marker has a compact
+global-orientation RGB triad and label, and remains in the preview marker list until the window
+closes. Select a marker in that list to edit its name, position, rotation matrix, and source
+status.
 
 The **Frame Origin** section reports the geometry-origin source or manual XYZ override. The
 **Primary Axis** and **Secondary Axis** sections follow the Simscape-style workflow: choose a
-signed frame axis, select **Along Reference Frame Axis** or **Based on Geometric Feature**, then
-use the selected face normal or edge tangent as needed. Principal inertia-axis controls are shown
-as planned but disabled. Switch click mode to **Select geometry feature** before choosing an axis
-feature. The primary direction remains dominant; the core math projects the secondary direction
-as necessary to form a right-handed frame.
+signed marker axis and a separate signed source/reference axis, then select **Along Reference
+Frame Axis** or **Based on Geometric Feature**. For example, setting primary marker axis `+Z` to
+reference axis `+X`, and secondary marker axis `+X` to reference axis `+Y`, makes local `+Z`
+point along global `+X` and local `+X` point along global `+Y`. The resulting rotation matrix is
+`[[0, 0, 1], [1, 0, 0], [0, 1, 0]]`.
+
+For geometric orientation, choose **Pick Primary Feature** or **Pick Secondary Feature**. The
+active click mode changes to vector picking, so the next face normal or edge tangent click updates
+the selected marker instead of creating another marker, then returns to **Select/Edit Marker**.
+**Flip Primary Direction** and **Flip Secondary Direction** reverse mesh normal/tangent direction
+when needed. Principal inertia-axis controls are shown as planned but disabled. The primary
+direction remains dominant; the core math projects the secondary direction to remove roll
+ambiguity while preserving a right-handed frame.
 
 The selected mesh feature is only a thin visual cue; marker triads and labels remain the primary
 visual objects. If the optional Qt dependencies are unavailable, the viewer reports that and

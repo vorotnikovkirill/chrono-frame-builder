@@ -17,6 +17,15 @@ from chrono_frame_builder.core.transform import (
 
 FeatureSource = FeatureCandidate | MeshEdgeSnapCandidate
 AXIS_SOURCE_MODES = frozenset({"reference", "feature", "inertia"})
+CLICK_MODES = frozenset(
+    {
+        "create_marker",
+        "select_edit",
+        "select_feature",
+        "pick_primary_vector",
+        "pick_secondary_vector",
+    }
+)
 
 
 def feature_origin_point(candidate: FeatureSource) -> np.ndarray:
@@ -102,10 +111,14 @@ class PreviewMarker:
     source_metadata: dict[str, Any] = field(default_factory=dict)
     primary_axis: str = "+Z"
     secondary_axis: str = "+X"
+    primary_reference_axis: str = "+Z"
+    secondary_reference_axis: str = "+X"
     primary_axis_source_mode: str = "reference"
     secondary_axis_source_mode: str = "reference"
     primary_feature: FeatureSource | None = None
     secondary_feature: FeatureSource | None = None
+    primary_direction_sign: int = 1
+    secondary_direction_sign: int = 1
 
     def as_frame(self) -> Frame:
         """Return this preview marker in the existing frame representation."""
@@ -124,7 +137,7 @@ class CreateFrameEditorState:
     markers: list[PreviewMarker] = field(default_factory=list)
     selected_marker_id: int | None = None
     selected_feature: FeatureSource | None = None
-    click_mode: str = "create_marker"
+    click_mode: str = "select_edit"
     warning: str | None = None
     _next_marker_id: int = 1
 
@@ -173,9 +186,48 @@ class CreateFrameEditorState:
 
     def set_click_mode(self, click_mode: str) -> None:
         """Set the viewer click behavior to marker creation or feature selection."""
-        if click_mode not in {"create_marker", "select_feature"}:
-            raise ValueError("Click mode must be 'create_marker' or 'select_feature'.")
-        self.click_mode = click_mode
+        normalized_mode = "select_edit" if click_mode == "select_feature" else click_mode
+        if normalized_mode not in CLICK_MODES:
+            valid = ", ".join(sorted(CLICK_MODES))
+            raise ValueError(f"Click mode must be one of: {valid}.")
+        self.click_mode = normalized_mode
+
+    def begin_pick_primary_vector(self) -> None:
+        """Enter the one-click geometry-picking mode for the primary vector source."""
+        self._require_selected_marker()
+        self.click_mode = "pick_primary_vector"
+        self.warning = None
+
+    def begin_new_marker(self) -> None:
+        """Enter the one-click marker creation mode."""
+        self.click_mode = "create_marker"
+        self.warning = None
+
+    def begin_pick_secondary_vector(self) -> None:
+        """Enter the one-click geometry-picking mode for the secondary vector source."""
+        self._require_selected_marker()
+        self.click_mode = "pick_secondary_vector"
+        self.warning = None
+
+    def handle_geometry_pick(self, candidate: FeatureSource) -> PreviewMarker | None:
+        """Apply the current click mode without accidentally creating an extra marker."""
+        if self.click_mode == "create_marker":
+            marker = self.create_marker_from_feature(candidate)
+            self.click_mode = "select_edit"
+            return marker
+
+        self.select_feature(candidate)
+        if self.click_mode == "select_edit":
+            return None
+        if self.click_mode == "pick_primary_vector":
+            marker = self.use_selected_feature_for_primary_axis()
+            self.click_mode = "select_edit"
+            return marker
+        if self.click_mode == "pick_secondary_vector":
+            marker = self.use_selected_feature_for_secondary_axis()
+            self.click_mode = "select_edit"
+            return marker
+        raise ValueError(f"Unsupported click mode: {self.click_mode}.")
 
     def rename_selected_marker(self, name: str) -> PreviewMarker:
         """Rename the selected preview marker."""
@@ -243,6 +295,38 @@ class CreateFrameEditorState:
             marker.secondary_axis = previous_axis
             raise
 
+    def set_primary_reference_axis(self, axis_selector: str) -> PreviewMarker:
+        """Set the primary reference/source axis and recompute when applicable."""
+        marker = self._require_selected_marker()
+        previous_axis = marker.primary_reference_axis
+        marker.primary_reference_axis = self._validate_axis_selector(
+            axis_selector,
+            role="primary source",
+        )
+        if marker.primary_axis_source_mode == "feature":
+            return marker
+        try:
+            return self.recompute_selected_marker_orientation()
+        except ValueError:
+            marker.primary_reference_axis = previous_axis
+            raise
+
+    def set_secondary_reference_axis(self, axis_selector: str) -> PreviewMarker:
+        """Set the secondary reference/source axis and recompute when applicable."""
+        marker = self._require_selected_marker()
+        previous_axis = marker.secondary_reference_axis
+        marker.secondary_reference_axis = self._validate_axis_selector(
+            axis_selector,
+            role="secondary source",
+        )
+        if marker.secondary_axis_source_mode == "feature":
+            return marker
+        try:
+            return self.recompute_selected_marker_orientation()
+        except ValueError:
+            marker.secondary_reference_axis = previous_axis
+            raise
+
     def set_primary_axis_source_mode(self, mode: str) -> PreviewMarker:
         """Set the primary-axis source mode and recompute when it is available."""
         marker = self._require_selected_marker()
@@ -265,13 +349,16 @@ class CreateFrameEditorState:
         candidate = self._require_selected_direction_feature()
         previous_mode = marker.primary_axis_source_mode
         previous_feature = marker.primary_feature
+        previous_sign = marker.primary_direction_sign
         marker.primary_axis_source_mode = "feature"
         marker.primary_feature = candidate
+        marker.primary_direction_sign = 1
         try:
             marker = self.recompute_selected_marker_orientation()
         except ValueError:
             marker.primary_axis_source_mode = previous_mode
             marker.primary_feature = previous_feature
+            marker.primary_direction_sign = previous_sign
             raise
         marker.source_metadata["primary_axis"] = feature_source_metadata(candidate)
         return marker
@@ -282,24 +369,57 @@ class CreateFrameEditorState:
         candidate = self._require_selected_direction_feature()
         previous_mode = marker.secondary_axis_source_mode
         previous_feature = marker.secondary_feature
+        previous_sign = marker.secondary_direction_sign
         marker.secondary_axis_source_mode = "feature"
         marker.secondary_feature = candidate
+        marker.secondary_direction_sign = 1
         try:
             marker = self.recompute_selected_marker_orientation()
         except ValueError:
             marker.secondary_axis_source_mode = previous_mode
             marker.secondary_feature = previous_feature
+            marker.secondary_direction_sign = previous_sign
             raise
         marker.source_metadata["secondary_axis"] = feature_source_metadata(candidate)
         return marker
+
+    def flip_primary_direction(self) -> PreviewMarker:
+        """Flip the selected marker's primary geometric vector direction."""
+        marker = self._require_selected_marker()
+        if marker.primary_axis_source_mode != "feature" or marker.primary_feature is None:
+            raise ValueError("Assign a geometric feature for the primary axis before flipping it.")
+        marker.primary_direction_sign *= -1
+        try:
+            return self.recompute_selected_marker_orientation()
+        except ValueError:
+            marker.primary_direction_sign *= -1
+            raise
+
+    def flip_secondary_direction(self) -> PreviewMarker:
+        """Flip the selected marker's secondary geometric vector direction."""
+        marker = self._require_selected_marker()
+        if marker.secondary_axis_source_mode != "feature" or marker.secondary_feature is None:
+            raise ValueError(
+                "Assign a geometric feature for the secondary axis before flipping it."
+            )
+        marker.secondary_direction_sign *= -1
+        try:
+            return self.recompute_selected_marker_orientation()
+        except ValueError:
+            marker.secondary_direction_sign *= -1
+            raise
 
     def reset_selected_marker_axes_to_reference(self) -> PreviewMarker:
         """Restore reference-axis orientation for the selected marker."""
         marker = self._require_selected_marker()
         marker.primary_axis_source_mode = "reference"
         marker.secondary_axis_source_mode = "reference"
+        marker.primary_reference_axis = marker.primary_axis
+        marker.secondary_reference_axis = marker.secondary_axis
         marker.primary_feature = None
         marker.secondary_feature = None
+        marker.primary_direction_sign = 1
+        marker.secondary_direction_sign = 1
         return self.recompute_selected_marker_orientation()
 
     def recompute_selected_marker_orientation(self) -> PreviewMarker:
@@ -331,16 +451,21 @@ class CreateFrameEditorState:
 
     def _axis_direction(self, marker: PreviewMarker, *, primary: bool) -> np.ndarray:
         mode = marker.primary_axis_source_mode if primary else marker.secondary_axis_source_mode
-        axis_selector = marker.primary_axis if primary else marker.secondary_axis
+        reference_axis = (
+            marker.primary_reference_axis if primary else marker.secondary_reference_axis
+        )
         feature = marker.primary_feature if primary else marker.secondary_feature
+        direction_sign = (
+            marker.primary_direction_sign if primary else marker.secondary_direction_sign
+        )
         axis_name = "primary" if primary else "secondary"
         if mode == "reference":
-            return reference_axis_direction(axis_selector)
+            return reference_axis_direction(reference_axis)
         if mode == "inertia":
             raise ValueError("Principal inertia axis support is not available yet.")
         if feature is None:
             raise ValueError(f"Assign a geometric feature for the {axis_name} axis first.")
-        return feature_direction_vector(feature)
+        return direction_sign * feature_direction_vector(feature)
 
     def _require_selected_marker(self) -> PreviewMarker:
         marker = self.selected_marker
@@ -393,6 +518,8 @@ def create_frame_editor_summary(state: CreateFrameEditorState) -> dict[str, str]
         "selected_marker": marker.name,
         "origin": np.array2string(marker.origin, precision=6, suppress_small=True),
         "origin_source": marker.origin_source,
+        "primary_reference_axis": marker.primary_reference_axis,
+        "secondary_reference_axis": marker.secondary_reference_axis,
         "primary_feature": primary_kind,
         "secondary_feature": secondary_kind,
         "message": state.warning or "Preview only: no project files are changed.",

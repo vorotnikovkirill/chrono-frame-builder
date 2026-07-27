@@ -125,12 +125,18 @@ def render_create_frame_qt(
     title = QLabel("Preview Markers", panel)
     title.setStyleSheet("font-weight: 600; font-size: 14px;")
     panel_layout.addWidget(title)
+    new_marker_button = QPushButton("New Marker", panel)
+    panel_layout.addWidget(new_marker_button)
 
     click_mode = QComboBox(panel)
     click_mode.addItem("Create marker", "create_marker")
-    click_mode.addItem("Select geometry feature", "select_feature")
+    click_mode.addItem("Select/Edit marker", "select_edit")
+    click_mode.setCurrentIndex(click_mode.findData(editor_state.click_mode))
     panel_layout.addWidget(QLabel("Click mode", panel))
     panel_layout.addWidget(click_mode)
+    click_mode_status = QLabel("Active: Create marker", panel)
+    click_mode_status.setStyleSheet("font-weight: 600;")
+    panel_layout.addWidget(click_mode_status)
 
     marker_list = QListWidget(panel)
     marker_list.setMinimumHeight(120)
@@ -188,7 +194,12 @@ def render_create_frame_qt(
     primary_layout = QVBoxLayout(primary_section)
     primary_axis = QComboBox(primary_section)
     primary_axis.addItems(AXIS_SELECTOR_ORDER)
+    primary_reference_axis = QComboBox(primary_section)
+    primary_reference_axis.addItems(AXIS_SELECTOR_ORDER)
+    primary_layout.addWidget(QLabel("Marker axis", primary_section))
     primary_layout.addWidget(primary_axis)
+    primary_layout.addWidget(QLabel("Reference/source axis", primary_section))
+    primary_layout.addWidget(primary_reference_axis)
     primary_reference = QRadioButton("Along Reference Frame Axis", primary_section)
     primary_inertia = QRadioButton("Along Principal Inertia Axis (planned)", primary_section)
     primary_inertia.setEnabled(False)
@@ -197,9 +208,11 @@ def render_create_frame_qt(
     for button in (primary_reference, primary_inertia, primary_feature):
         primary_group.addButton(button)
         primary_layout.addWidget(button)
-    primary_use_feature = QPushButton("Use Selected Feature", primary_section)
+    primary_use_feature = QPushButton("Pick Primary Feature", primary_section)
+    primary_flip_direction = QPushButton("Flip Primary Direction", primary_section)
     primary_source = QLabel("<none>", primary_section)
     primary_layout.addWidget(primary_use_feature)
+    primary_layout.addWidget(primary_flip_direction)
     primary_layout.addWidget(primary_source)
     panel_layout.addWidget(primary_section)
 
@@ -207,7 +220,12 @@ def render_create_frame_qt(
     secondary_layout = QVBoxLayout(secondary_section)
     secondary_axis = QComboBox(secondary_section)
     secondary_axis.addItems(AXIS_SELECTOR_ORDER)
+    secondary_reference_axis = QComboBox(secondary_section)
+    secondary_reference_axis.addItems(AXIS_SELECTOR_ORDER)
+    secondary_layout.addWidget(QLabel("Marker axis", secondary_section))
     secondary_layout.addWidget(secondary_axis)
+    secondary_layout.addWidget(QLabel("Reference/source axis", secondary_section))
+    secondary_layout.addWidget(secondary_reference_axis)
     secondary_reference = QRadioButton("Along Reference Frame Axis", secondary_section)
     secondary_inertia = QRadioButton("Along Principal Inertia Axis (planned)", secondary_section)
     secondary_inertia.setEnabled(False)
@@ -216,15 +234,17 @@ def render_create_frame_qt(
     for button in (secondary_reference, secondary_inertia, secondary_feature):
         secondary_group.addButton(button)
         secondary_layout.addWidget(button)
-    secondary_use_feature = QPushButton("Use Selected Feature", secondary_section)
+    secondary_use_feature = QPushButton("Pick Secondary Feature", secondary_section)
+    secondary_flip_direction = QPushButton("Flip Secondary Direction", secondary_section)
     secondary_source = QLabel("<none>", secondary_section)
     secondary_layout.addWidget(secondary_use_feature)
+    secondary_layout.addWidget(secondary_flip_direction)
     secondary_layout.addWidget(secondary_source)
     reset_axes = QPushButton("Reset axes to reference", secondary_section)
     secondary_layout.addWidget(reset_axes)
     panel_layout.addWidget(secondary_section)
 
-    message_label = QLabel("Click geometry to create marker_001.", panel)
+    message_label = QLabel("Click New Marker, then click geometry to place marker_001.", panel)
     message_label.setWordWrap(True)
     message_label.setStyleSheet("color: #7f1d1d;")
     panel_layout.addWidget(message_label)
@@ -262,6 +282,19 @@ def render_create_frame_qt(
         marker = editor_state.selected_marker
         summary = create_frame_editor_summary(editor_state)
         message_label.setText(message or summary["message"])
+        click_mode_labels = {
+            "create_marker": "Create Marker",
+            "select_edit": "Select/Edit Marker",
+            "pick_primary_vector": "Pick Primary Vector",
+            "pick_secondary_vector": "Pick Secondary Vector",
+        }
+        click_mode_status.setText(
+            f"Active: {click_mode_labels.get(editor_state.click_mode, editor_state.click_mode)}"
+        )
+        click_mode.blockSignals(True)
+        if editor_state.click_mode in {"create_marker", "select_edit"}:
+            click_mode.setCurrentIndex(click_mode.findData(editor_state.click_mode))
+        click_mode.blockSignals(False)
         origin_source.setText(summary["origin_source"])
         properties.setEnabled(marker is not None)
         origin_section.setEnabled(marker is not None)
@@ -284,10 +317,16 @@ def render_create_frame_qt(
                 field.setText(f"{marker.rotation_matrix[row, column]:.9g}")
         primary_axis.blockSignals(True)
         secondary_axis.blockSignals(True)
+        primary_reference_axis.blockSignals(True)
+        secondary_reference_axis.blockSignals(True)
         primary_axis.setCurrentText(marker.primary_axis)
         secondary_axis.setCurrentText(marker.secondary_axis)
+        primary_reference_axis.setCurrentText(marker.primary_reference_axis)
+        secondary_reference_axis.setCurrentText(marker.secondary_reference_axis)
         primary_axis.blockSignals(False)
         secondary_axis.blockSignals(False)
+        primary_reference_axis.blockSignals(False)
+        secondary_reference_axis.blockSignals(False)
         primary_reference.blockSignals(True)
         primary_feature.blockSignals(True)
         secondary_reference.blockSignals(True)
@@ -300,6 +339,8 @@ def render_create_frame_qt(
         primary_feature.blockSignals(False)
         secondary_reference.blockSignals(False)
         secondary_feature.blockSignals(False)
+        primary_reference_axis.setEnabled(marker.primary_axis_source_mode == "reference")
+        secondary_reference_axis.setEnabled(marker.secondary_axis_source_mode == "reference")
         primary_source.setText(feature_source_text(marker.primary_feature))
         secondary_source.setText(feature_source_text(marker.secondary_feature))
         refresh_marker_list()
@@ -410,6 +451,10 @@ def render_create_frame_qt(
         editor_state.set_click_mode(str(click_mode.currentData()))
         update_panel()
 
+    def begin_new_marker() -> None:
+        editor_state.begin_new_marker()
+        update_panel("Click geometry to place the next preview marker.")
+
     def set_primary_axis(axis_selector: str) -> None:
         try:
             editor_state.set_primary_axis(axis_selector)
@@ -422,6 +467,24 @@ def render_create_frame_qt(
     def set_secondary_axis(axis_selector: str) -> None:
         try:
             editor_state.set_secondary_axis(axis_selector)
+        except ValueError as error:
+            report_error(error)
+            return
+        draw_markers()
+        update_panel()
+
+    def set_primary_reference_axis(axis_selector: str) -> None:
+        try:
+            editor_state.set_primary_reference_axis(axis_selector)
+        except ValueError as error:
+            report_error(error)
+            return
+        draw_markers()
+        update_panel()
+
+    def set_secondary_reference_axis(axis_selector: str) -> None:
+        try:
+            editor_state.set_secondary_reference_axis(axis_selector)
         except ValueError as error:
             report_error(error)
             return
@@ -470,18 +533,34 @@ def render_create_frame_qt(
         draw_markers()
         update_panel()
 
-    def use_primary_feature() -> None:
+    def begin_pick_primary_feature() -> None:
         try:
-            editor_state.use_selected_feature_for_primary_axis()
+            editor_state.begin_pick_primary_vector()
+        except ValueError as error:
+            report_error(error)
+            return
+        update_panel("Pick a face normal or edge tangent for the primary axis.")
+
+    def begin_pick_secondary_feature() -> None:
+        try:
+            editor_state.begin_pick_secondary_vector()
+        except ValueError as error:
+            report_error(error)
+            return
+        update_panel("Pick a face normal or edge tangent for the secondary axis.")
+
+    def flip_primary_direction() -> None:
+        try:
+            editor_state.flip_primary_direction()
         except ValueError as error:
             report_error(error)
             return
         draw_markers()
         update_panel()
 
-    def use_secondary_feature() -> None:
+    def flip_secondary_direction() -> None:
         try:
-            editor_state.use_selected_feature_for_secondary_axis()
+            editor_state.flip_secondary_direction()
         except ValueError as error:
             report_error(error)
             return
@@ -503,8 +582,14 @@ def render_create_frame_qt(
         if point is None:
             return
         candidate, warning = snap_candidate_from_displayable_mesh_pick(point, displayable_meshes)
-        if editor_state.click_mode == "create_marker":
-            marker = editor_state.create_marker_from_feature(candidate)
+        click_mode_before_pick = editor_state.click_mode
+        try:
+            marker = editor_state.handle_geometry_pick(candidate)
+        except ValueError as error:
+            report_error(error)
+            return
+
+        if click_mode_before_pick == "create_marker":
             clear_selected_feature_cue()
             draw_markers()
             if warning is not None:
@@ -513,22 +598,33 @@ def render_create_frame_qt(
             update_panel()
             return
 
-        editor_state.select_feature(candidate)
+        if click_mode_before_pick in {"pick_primary_vector", "pick_secondary_vector"}:
+            clear_selected_feature_cue()
+            draw_markers()
+            print(f"Assigned axis feature: {feature_summary(candidate)}")
+            update_panel()
+            return
+
         draw_selected_feature(candidate)
         print(f"Selected axis feature: {feature_summary(candidate)}")
         update_panel()
 
     click_mode.currentIndexChanged.connect(set_click_mode)
+    new_marker_button.clicked.connect(begin_new_marker)
     marker_list.currentItemChanged.connect(lambda current, _previous: select_list_marker(current))
     apply_properties_button.clicked.connect(apply_properties)
     primary_axis.currentTextChanged.connect(set_primary_axis)
     secondary_axis.currentTextChanged.connect(set_secondary_axis)
+    primary_reference_axis.currentTextChanged.connect(set_primary_reference_axis)
+    secondary_reference_axis.currentTextChanged.connect(set_secondary_reference_axis)
     primary_reference.toggled.connect(set_primary_reference_mode)
     primary_feature.toggled.connect(set_primary_mode)
     secondary_reference.toggled.connect(set_secondary_reference_mode)
     secondary_feature.toggled.connect(set_secondary_mode)
-    primary_use_feature.clicked.connect(use_primary_feature)
-    secondary_use_feature.clicked.connect(use_secondary_feature)
+    primary_use_feature.clicked.connect(begin_pick_primary_feature)
+    secondary_use_feature.clicked.connect(begin_pick_secondary_feature)
+    primary_flip_direction.clicked.connect(flip_primary_direction)
+    secondary_flip_direction.clicked.connect(flip_secondary_direction)
     reset_axes.clicked.connect(reset_marker_axes)
 
     picking_options = {
